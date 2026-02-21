@@ -1,46 +1,22 @@
 const TelegramBot = require('node-telegram-bot-api');
 const { createClient } = require('@supabase/supabase-js');
 
-// Add validation
-const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_KEY', 'BOT_TOKEN', 'CHANNEL_ID', 'URL'];
-for (const envVar of requiredEnvVars) {
-  if (!process.env[envVar]) {
-    console.error(`Missing required environment variable: ${envVar}`);
-  }
-}
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: false });
+const botToken = process.env.BOT_TOKEN;
+const channelId = process.env.CHANNEL_ID;
+const bot = new TelegramBot(botToken, { polling: false });
 
 exports.handler = async (event) => {
-  // Add CORS headers for web access
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS'
-  };
-
-  // Handle preflight OPTIONS request
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
-  }
-
   try {
-    if (event.httpMethod !== 'POST') {
-      return { statusCode: 405, headers, body: JSON.stringify({ error: 'Method not allowed' }) };
-    }
-
     const { message, type, userId } = JSON.parse(event.body);
-    
-    if (!message || !type || !userId) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing required fields' }) };
-    }
-
     const messageId = Date.now().toString(36);
     const commentUrl = `${process.env.URL}/comment.html?msg=${messageId}`;
 
     // Store in Supabase
-    const { error: dbError } = await supabase
+    const { error } = await supabase
       .from('messages')
       .insert([{
         message_id: messageId,
@@ -49,27 +25,18 @@ exports.handler = async (event) => {
         message_type: type
       }]);
 
-    if (dbError) throw dbError;
+    if (error) throw error;
 
     const formattedMessage = `${getTypeEmoji(type)} Anonymous ${type}:\n\n${message}\n\n💬 [Comment anonymously](${commentUrl})`;
 
-    await bot.sendMessage(process.env.CHANNEL_ID, formattedMessage, {
+    await bot.sendMessage(channelId, formattedMessage, {
       parse_mode: 'Markdown',
       disable_web_page_preview: true
     });
 
-    return { 
-      statusCode: 200, 
-      headers, 
-      body: JSON.stringify({ success: true }) 
-    };
+    return { statusCode: 200, body: JSON.stringify({ success: true }) };
   } catch (error) {
-    console.error('Forward error:', error);
-    return { 
-      statusCode: 500, 
-      headers, 
-      body: JSON.stringify({ error: error.message }) 
-    };
+    return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
   }
 };
 
