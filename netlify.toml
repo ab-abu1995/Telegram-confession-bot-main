@@ -1,0 +1,39 @@
+[build]
+  command = "npm install"
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+  # Important: Include all dependencies
+  external_node_modules = ["node-telegram-bot-api", "@supabase/supabase-js"]
+
+# Serve static files from public folder
+[[redirects]]
+  from = "/"
+  to = "/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/comment.html"
+  to = "/comment.html"
+  status = 200
+
+# Make functions accessible
+[[redirects]]
+  from = "/api/forward"
+  to = "/.netlify/functions/forward"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/api/comment" 
+  to = "/.netlify/functions/comment"
+  status = 200
+  force = true
+
+# Handle 404s - redirect to index
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 404
